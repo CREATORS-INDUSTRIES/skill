@@ -1,19 +1,25 @@
-# @crtrs/skill
+### Hard Skills
 
-Parser for hard skills files. A hard skill is markdown prose for the
-model, plus ` ```tool ` fences that declare executable tools. 
+Parser, compiler and resolver for hard skills: markdown skills with embedded
+executable ` ```tool ` fences. One file declares what the model reads, what it
+may call, and what runs when it calls. The declared tools are the contract.
 
-## Install
+This package is the general purpose skill layer, engine-neutral by design: no model calls, no SDK bindings, zero runtime dependencies.
+
+Built at [CREATORS](https://creators.industries)  
+
+### Install
 
 ```bash
 npm install @crtrs/skill
 ```
 
-## Skill file
+### Skill file
 
 ````markdown
 ---
 skill: waitlist
+description: Accept, reject and inspect waitlist signups.
 ---
 
 Manage the product waitlist.
@@ -37,22 +43,22 @@ run: uv run waitlist/handle.py --$operation $user
 Prefer accepting users unless told otherwise.
 ````
 
-The fence grammar is a deliberately closed YAML subset — `id`, `description`,
-`params`, `run`. Anything outside that shape is a `SkillError`, not a guess.
-`run` is split into argv words at resolve time and `$param` tokens substitute
-inside words: no shell, ever.
+A tool fence has four keys: `id`, `description`, `params`, `run`.
 
-Params are flat JSON Schema. `type` must be a JSON Schema primitive (`string`,
-`number`, `integer`, `boolean`, `object`, `array`); semantics ride the standard
-keywords — `format` for semantic strings (`email`, `uri`, or any custom word:
-format is an open annotation vocabulary in JSON Schema 2020-12), `enum` for
-closed value sets, plus `description` and `default`. Static checks at parse
-time: invalid types, unknown keys, and a `default` outside its `enum` are all
-errors.
+- Params are flat JSON Schema: `type`, `format`, `enum`, `description`, `default`.
+- No `default` means required.
+- Anything outside the shape is a `SkillError` at parse time.
+- `run` becomes an argv, `$param` substitutes per word. No shell, ever:
+
+```js
+'uv run waitlist/handle.py --$operation $user'
+// { operation: 'accept', user: 'x@y.z' }
+['uv', 'run', 'waitlist/handle.py', '--accept', 'x@y.z']
+```
 
 ## Use
 
-The whole loop is four lines -- the package owns everything except the
+The whole loop is four lines. The package owns everything except the
 inference call:
 
 ```js
@@ -64,31 +70,29 @@ const output = await myInference(system); // your model, your way
 const call = resolve(skill.tools, output);
 ```
 
-`compile` produces the system text: the skill's prose (fences collapsed to
-tool ids) followed by the call protocol -- the exact wire shape `resolve`
-parses plus the tool catalog. Same parse feeds both, so what the model is told
-and what the parser accepts cannot drift.
+`compile` emits the system text: the prose with fences collapsed to tool
+ids, then the call protocol with the tool catalog in JSON Schema. Same parse
+feeds both, so what the model is told and what `resolve` accepts cannot
+drift.
 
-`resolve` takes the model's raw text, or an already-structured call object
-(e.g. an SDK's native tool-calling output):
+`resolve` takes raw model text or an already-structured call (an SDK's
+native tool-calling output). It validates against the tool's schema:
+defaults filled, required enforced, enums checked, primitives coerced.
 
 ```js
 if (call === null) {
-  // no tool call in the text. What that means -- final answer, retry,
-  // something else -- is your loop's decision, not the package's.
+  // no tool call in the text. What that means is your loop's decision.
 } else {
   call.tool.id; // 'access'
-  call.args;    // { operation: 'accept', user: 'x@y.z' }  (default filled)
+  call.args;    // { operation: 'accept', user: 'x@y.z' }
   call.argv;    // ['uv', 'run', 'waitlist/handle.py', '--accept', 'x@y.z']
 }
-// Invalid calls throw SkillError with a message written to feed back to
-// the model (unknown tool, missing required arg, enum violation, ...).
+// Invalid calls throw SkillError, worded to feed straight back to the model.
 ```
 
-Using a SDK's native tool-calling instead of raw text? Skip `compile`: use
-`skill.rendered` as the system text and hand each tool over directly,
-`tool.schema` is already valid JSON Schema (Anthropic, OpenAI and MCP all
-take it as the input schema):
+On an SDK's native tool-calling, skip `compile`: send `skill.rendered` as
+system text and hand tools over directly. `tool.schema` is already valid
+JSON Schema, the shape Anthropic, OpenAI and MCP take as input schema:
 
 ```js
 const tools = skill.tools.map((tool) => ({
@@ -98,12 +102,9 @@ const tools = skill.tools.map((tool) => ({
 }));
 ```
 
-The package never calls a model. You own the loop, it referees both directions
-of the contract: what the model may call, and what it actually called.
-
 API: `parseSkill(source, { file, workdir })`, `parseSkillFile(path)`,
-`compile(skill)`, `resolve(tools, answer)`, `SkillError`.
-Full types in `index.d.ts`.
+`compile(skill)`, `resolve(tools, answer)`, `SkillError`. Full types in
+`index.d.ts`.
 
 ## License
 
