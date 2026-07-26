@@ -4,7 +4,7 @@
   "description": "Parser for hard skill files",
   "author": "CREATORS",
   "license": "Apache-2.0",
-  "homepage": "https://creators.industries",
+  "homepage": "https://creators.industries/research/hard-skills",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/CREATORS-INDUSTRIES/skill.git",
