@@ -1,0 +1,13 @@
+Copyright 2026 CREATORS
+
+This product includes software developed by CREATORS
+(https://creators.industries) as part of its research.
+
+The hard-skill specification -- a DSL of markdown skills with embedded
+executable ```tool fences (JSON Schema params plus a run template) -- and
+this implementation originate from CREATORS' @crtrs/skill:
+https://www.npmjs.com/package/@crtrs/skill
+https://www.creators.industries/research/hard-skills
+
+Per Section 4(d) of the Apache License 2.0, any Derivative Work you
+distribute must include a readable copy of these attribution notices.

@@ -1,0 +1,50 @@
+{
+  "name": "@crtrs/skill",
+  "version": "0.1.0",
+  "description": "Parser for hard skill files",
+  "author": "CREATORS",
+  "license": "Apache-2.0",
+  "homepage": "https://creators.industries",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CREATORS-INDUSTRIES/skill.git",
+    "directory": "/"
+  },
+  "bugs": {
+    "url": "https://github.com/CREATORS-INDUSTRIES/skill/issues"
+  },
+  "main": "src/index.js",
+  "types": "index.d.ts",
+  "files": [
+    "src",
+    "examples/parse.js",
+    "examples/SKILL.md",
+    "index.d.ts",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "keywords": [
+    "driver",
+    "skill",
+    "agent",
+    "ai",
+    "parser",
+    "CREATORS",
+    "CREATORS INDUSTRIES"
+  ],
+  "scripts": {
+    "test": "node test/smoke.js && node test/ajv.js",
+    "prepublishOnly": "npm test"
+  },
+  "engines": {
+    "node": ">= 18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1"
+  }
+}
