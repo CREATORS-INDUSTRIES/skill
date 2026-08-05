@@ -6,6 +6,7 @@
 // `run` template becomes a concrete argv, with no shell anywhere.
 
 const { SkillError } = require('./error');
+const { renderArgv } = require('./argv');
 
 /**
  * Resolve a model's answer into the tool call it asks for. Takes either the
@@ -37,9 +38,9 @@ function resolve(tools, answer) {
   }
 
   const args = validateArgs(tool, call.args);
-  // The run template splits into argv words here, values substitute inside
-  // each word, and no shell is ever involved.
-  return { tool, args, argv: renderArgv(tool.run.trim().split(/\s+/), args, tool.id) };
+  // The run template becomes argv here, values substitute inside their word,
+  // and no shell is ever involved.
+  return { tool, args, argv: renderArgv(tool.run, args, tool.id) };
 }
 
 // Find the call object in a model's output. Tries, in order: the whole text as
@@ -163,23 +164,6 @@ function coerce(tool, name, prop, value) {
     default:
       return value;
   }
-}
-
-// Build the concrete argv for a call: every $name token in a template word is
-// replaced with the arg's value. No shell anywhere -- values substitute inside
-// each word, so an argument can never smuggle in extra commands or
-// flags-through-whitespace. A token with no matching arg throws -- better a
-// loud error than silently running with a hole in the command.
-function renderArgv(template, args, toolName) {
-  return template.map((word) =>
-    word.replace(/\$([A-Za-z0-9_]+)/g, (_, name) => {
-      if (!(name in args) || args[name] === undefined || args[name] === null) {
-        throw new SkillError(`missing value for $${name} in tool '${toolName}'`);
-      }
-      const v = args[name];
-      return typeof v === 'string' ? v : JSON.stringify(v);
-    }),
-  );
 }
 
 module.exports = { resolve };

@@ -27,10 +27,16 @@ export interface SkillTool {
    */
   schema: JSONSchema;
   /**
-   * The run template as written. At resolve time it splits into argv words and
-   * `$param` values substitute inside each word -- no shell, ever.
+   * The run template as written. At resolve time it becomes argv and `$param`
+   * values substitute inside each word -- no shell, ever.
+   *
+   * A string splits on whitespace. A list is already the words, each item
+   * taken verbatim, which is how a word holds a space -- there is no quoting,
+   * so a quote in a template belongs to whatever language it is written in.
+   * `$$` is a literal dollar. `|`, `>`, `;` and backticks are ordinary
+   * characters, and a value substitutes inside its word and can never split it.
    */
-  run: string;
+  run: string | string[];
   /** Directory the command executes from (the skill file's directory). */
   workdir: string;
 }

@@ -56,6 +56,37 @@ A tool fence has four keys: `id`, `description`, `params`, `run`.
 ['uv', 'run', 'waitlist/handle.py', '--accept', 'x@y.z']
 ```
 
+### When a word needs a space
+
+Whitespace ends a word, which is all a command line ever needs — until one
+word has to hold a space. Then `run` is a list, and each item is exactly one
+argv word, verbatim:
+
+```yaml
+run:
+  - awk
+  - -v
+  - f=$file
+  - BEGIN{while((getline l<f)>0){n++; print n": "l}}
+```
+
+There is no quoting. Quotes would mean a character that sometimes groups words
+and sometimes is just itself, and a run template carries other languages —
+python, awk, sed — that spend quotes on their own strings. `python -c
+print('hi')` passes `print('hi')`, quotes and all. A list has nothing to escape
+and nothing to strip: what is written is what the process receives.
+
+The shell's other characters are ordinary too. `|`, `>`, `;`, `&&`, `*` and
+backticks are just characters in an argv word — no pipe, no redirect, no glob,
+and no expansion of anything but the params the tool declared. A value
+substitutes *inside* its word and can never split it.
+
+`$$` is a literal dollar, and it is the one escape there has to be: without it
+a `$0` in an awk program would read as a param named `0`.
+
+A `$name` that was never declared is a `SkillError` at parse time, not a
+surprise the first time a model calls the tool.
+
 ## Use
 
 The whole loop is four lines. The package owns everything except the

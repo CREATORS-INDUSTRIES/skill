@@ -10,6 +10,7 @@
 const { readFileSync } = require('fs');
 const { dirname, resolve: resolvePath } = require('path');
 const { SkillError } = require('./error');
+const { checkTemplate } = require('./argv');
 
 /**
  * Read and parse a skill file. Tool `run` templates resolve relative to the
@@ -117,10 +118,21 @@ const PARAM_KEYS = new Set(['type', 'format', 'enum', 'description', 'default'])
 function parseToolBlock(body, file, workdir) {
   const tool = { params: [] };
   let inParams = false;
+  let inRun = false;
   let param = null;
 
   for (const raw of body) {
     if (!raw.trim() || raw.trim().startsWith('#')) continue;
+
+    // `run` written as a list: each item is exactly one argv word, taken
+    // verbatim. Nothing is stripped, so a word may hold spaces, quotes, or
+    // anything else the command it runs expects to receive.
+    const item = inRun && raw.match(/^\s+-\s?(.*)$/);
+    if (item) {
+      tool.run.push(item[1].trimEnd());
+      continue;
+    }
+
     const m = raw.match(/^(\s*)([A-Za-z0-9_-]+):\s*(.*)$/);
     if (!m) throw new SkillError(`bad line in tool block: '${raw.trim()}'`, file);
     const indent = m[1];
@@ -129,8 +141,10 @@ function parseToolBlock(body, file, workdir) {
 
     if (indent.length === 0) {
       inParams = key === 'params';
+      inRun = key === 'run' && value.trim() === '';
       param = null;
-      if (!inParams) tool[key] = value.trim();
+      if (inRun) tool.run = [];
+      else if (!inParams) tool[key] = value.trim();
     } else if (inParams && indent.length === 2) {
       param = { name: key, type: 'string', description: '' };
       tool.params.push(param);
@@ -148,7 +162,9 @@ function parseToolBlock(body, file, workdir) {
   }
 
   if (!tool.id) throw new SkillError("a tool block is missing 'id'", file);
-  if (!tool.run) throw new SkillError(`tool '${tool.id}' is missing 'run'`, file);
+  if (!tool.run || (Array.isArray(tool.run) && tool.run.length === 0)) {
+    throw new SkillError(`tool '${tool.id}' is missing 'run'`, file);
+  }
 
   for (const p of tool.params) {
     if (!SCHEMA_TYPES.has(p.type)) {
@@ -181,6 +197,11 @@ function parseToolBlock(body, file, workdir) {
   }
   const schema = { type: 'object', properties };
   if (required.length > 0) schema.required = required;
+
+  // The run template is checked here, not the first time a model calls the
+  // tool: an unterminated quote or a `$typo` is a broken tool, and a broken
+  // tool should fail when the file is read.
+  checkTemplate(tool.run, Object.keys(properties), tool.id, file);
 
   return {
     id: tool.id,

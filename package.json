@@ -1,6 +1,6 @@
 {
   "name": "@crtrs/skill",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Parser for hard skill files",
   "author": "CREATORS",
   "license": "Apache-2.0",
@@ -34,7 +34,7 @@
     "CREATORS INDUSTRIES"
   ],
   "scripts": {
-    "test": "node test/smoke.js && node test/ajv.js",
+    "test": "node test/smoke.js && node test/ajv.js && node test/argv.js",
     "prepublishOnly": "npm test"
   },
   "engines": {
