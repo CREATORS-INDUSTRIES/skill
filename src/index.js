@@ -12,6 +12,7 @@
 
 const { SkillError } = require('./error');
 const { parseSkill, parseSkillFile, includedFiles } = require('./parse');
+const { programs } = require('./argv');
 const { compile } = require('./compile');
 const { resolve } = require('./resolve');
 
@@ -20,6 +21,7 @@ module.exports = {
   parseSkill,
   parseSkillFile,
   includedFiles,
+  programs,
   compile,
   resolve,
 };

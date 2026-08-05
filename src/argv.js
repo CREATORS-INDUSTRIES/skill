@@ -131,4 +131,33 @@ function renderArgv(run, args, id, file) {
   );
 }
 
-module.exports = { tokenize, checkTemplate, renderArgv };
+/**
+ * The programs a skill can spawn: the first word of every `run`, deduplicated
+ * and sorted, each with the tools that reach for it.
+ *
+ * This is knowable without running anything, and that is a property of the
+ * format rather than a trick. There is no shell, so the first word of a run is
+ * the executable -- it cannot be a function, an alias, an expansion, or a
+ * second command hiding behind a `;`. A host can tell you a skill needs `uv`
+ * before you approve it, and say which tool will fail if you do not have it.
+ *
+ * A run whose first word holds a param (`run: $cmd --flag`) has no program
+ * until the call is made; it comes back `dynamic`, named as it was written.
+ *
+ * @param {{tools: object[]}} skill a parsed skill
+ * @returns {Array<{name: string, dynamic: boolean, tools: string[]}>}
+ */
+function programs(skill) {
+  const found = new Map();
+  for (const tool of (skill && skill.tools) || []) {
+    const word = tokenize(tool.run, tool.id)[0];
+    const dynamic = word.some((seg) => seg.param !== undefined);
+    const name = word.map((seg) => (seg.param === undefined ? seg.lit : `$${seg.param}`)).join('');
+    const key = `${dynamic ? '$' : ''}${name}`;
+    if (!found.has(key)) found.set(key, { name, dynamic, tools: [] });
+    found.get(key).tools.push(tool.id);
+  }
+  return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+module.exports = { tokenize, checkTemplate, renderArgv, programs };

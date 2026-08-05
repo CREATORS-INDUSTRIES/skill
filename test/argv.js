@@ -5,7 +5,7 @@
 // nothing is stripped from what was written.
 
 const assert = require('assert');
-const { SkillError, parseSkill, resolve } = require('..');
+const { SkillError, parseSkill, resolve, programs } = require('..');
 
 // A skill built around one run template, so a case is one string.
 function toolWith(run, params = 'text:\n    type: string\n    default: x') {
@@ -115,3 +115,26 @@ assert.throws(
 );
 
 console.log('argv ok');
+
+// --- programs ----------------------------------------------------------------
+
+// What a skill will spawn, known before anything runs: the first word of every
+// run, which the absence of a shell makes an executable and nothing else.
+{
+  const skill = parseSkill(
+    '```tool\nid: a\nrun: uv run handle.py $x\nparams:\n  x:\n    type: string\n```\n' +
+      '```tool\nid: b\nrun: uv run other.py\n```\n' +
+      '```tool\nid: c\nrun:\n  - awk\n  - -v\n  - f=1\n```\n' +
+      '```tool\nid: d\nparams:\n  cmd:\n    type: string\nrun: $cmd --flag\n```\n' +
+      '```tool\nid: e\nrun: $$HOME/bin/tool --go\n```',
+  );
+  assert.deepStrictEqual(programs(skill), [
+    { name: '$cmd', dynamic: true, tools: ['d'] },
+    { name: '$HOME/bin/tool', dynamic: false, tools: ['e'] },
+    { name: 'awk', dynamic: false, tools: ['c'] },
+    { name: 'uv', dynamic: false, tools: ['a', 'b'] },
+  ]);
+  assert.deepStrictEqual(programs({ tools: [] }), [], 'a skill with no tools spawns nothing');
+}
+
+console.log('programs ok');

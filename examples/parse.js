@@ -1,15 +1,32 @@
 'use strict';
 
-// Parse a skill file and show it in four sections: the skill header, what it
-// carries beside its own text, each tool with its params, and the compiled
-// skill -- the system text as the model receives it, with every tool fence
-// interpolated down to its id.
+// Parse a skill file and show it in five sections: the skill header, what it
+// carries beside its own text, what it needs on this machine, each tool with
+// its params, and the compiled skill -- the system text as the model receives
+// it, with every tool fence interpolated down to its id.
 //
 //   node examples/parse.js                # bundled examples/SKILL.md
 //   node examples/parse.js path/SKILL.md  # your own skill
 
-const { join } = require('path');
-const { parseSkillFile, compile, includedFiles } = require('..');
+const { delimiter, join } = require('path');
+const { statSync } = require('fs');
+const { parseSkillFile, compile, includedFiles, programs } = require('..');
+
+// Where a program would be found, or null: PATH in order, first file with an
+// execute bit. The package does not do this for you -- it names the programs,
+// and the host decides what "available" means on its platform.
+function found(name) {
+  for (const dir of (process.env.PATH || '').split(delimiter).filter(Boolean)) {
+    const path = join(dir, name);
+    try {
+      const stat = statSync(path);
+      if (stat.isFile() && stat.mode & 0o111) return path;
+    } catch {
+      // not here; keep looking
+    }
+  }
+  return null;
+}
 
 const file = process.argv[2] || join(__dirname, 'SKILL.md');
 
@@ -49,6 +66,23 @@ if (skill.includes.length > 0) {
   section('includes');
   console.log(skill.includes.join(', '));
   for (const path of includedFiles(skill)) console.log(gray(`  ${path}`));
+}
+
+// What the skill needs on the machine: the first word of every run, which is
+// the executable and can be nothing else, since no shell is involved. Checked
+// against PATH here the same way a host would check it before letting someone
+// approve the skill.
+const needs = programs(skill);
+if (needs.length > 0) {
+  section('needs');
+  const width = Math.max(0, ...needs.map((p) => p.name.length));
+  for (const program of needs) {
+    const where = program.dynamic
+      ? 'named by the call, not known until then'
+      : found(program.name) || 'not on your PATH';
+    console.log(`  ${program.name.padEnd(width)}  ${gray(where)}`);
+    console.log(`  ${' '.repeat(width)}  ${gray(program.tools.join(', '))}`);
+  }
 }
 
 section('tools');

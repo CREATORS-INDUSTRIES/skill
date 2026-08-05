@@ -84,6 +84,24 @@ export function parseSkillFile(file: string): Skill;
  */
 export function includedFiles(skill: Skill): string[];
 
+/** A program a skill can spawn, and the tools that reach for it. */
+export interface SkillProgram {
+  /** The executable, as written in the run template. */
+  name: string;
+  /** True when the first word holds a param, so the program is only known at call time. */
+  dynamic: boolean;
+  /** Ids of the tools whose `run` starts with it. */
+  tools: string[];
+}
+
+/**
+ * The programs a skill can spawn: the first word of every `run`, deduplicated
+ * and sorted. Knowable statically because there is no shell -- the first word
+ * is the executable, never an alias, an expansion, or a second command. Use it
+ * to tell someone what a skill needs on their machine before they approve it.
+ */
+export function programs(skill: Skill): SkillProgram[];
+
 /**
  * Compile a parsed skill into the model-facing system text: the prose (fences
  * collapsed to tool ids) followed by the call protocol -- the exact wire shape

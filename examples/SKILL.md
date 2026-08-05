@@ -33,6 +33,21 @@ params:
 run: bash scripts/deploy.sh --$action --env $env --version $version
 ```
 
+To see what shipped before now, read the history. It runs a python script
+whose dependencies are declared in the script itself (PEP 723), so `uv` builds
+the environment on the spot and the skill stays a folder you can copy:
+
+```tool
+id: history
+description: the last few versions deployed to an environment, newest first
+params:
+  env:
+    type: string
+    enum: staging, production
+    description: environment to read the history of
+run: uv run --script scripts/history.py $env
+```
+
 To see what is currently live, check the status:
 
 ```tool

@@ -91,6 +91,22 @@ includedFiles(skill);    // ['Makefile', 'handle.py', 'queries/nested/deep.sql',
 skill moves. Symlinks are refused rather than followed — what one points at is
 not part of the skill, and it would arrive somewhere else as a dangling name.
 
+### What a skill needs on the machine
+
+Because there is no shell, the first word of a `run` is the executable — never
+an alias, an expansion, or a second command hiding behind a `;`. So what a
+skill will spawn is knowable before it runs once:
+
+```js
+programs(skill);
+// [{ name: 'uv', dynamic: false, tools: ['dump', 'restore'] }]
+```
+
+That is the list to check against a `PATH` before someone approves a skill, so
+"this needs `uv`, which you do not have" arrives before the run and not three
+tool calls into it. A run whose first word holds a param (`run: $cmd --flag`)
+has no program until the call is made, and comes back `dynamic`.
+
 ### When a word needs a space
 
 Whitespace ends a word, which is all a command line ever needs — until one
@@ -169,8 +185,8 @@ const tools = skill.tools.map((tool) => ({
 ```
 
 API: `parseSkill(source, { file, workdir })`, `parseSkillFile(path)`,
-`includedFiles(skill)`, `compile(skill)`, `resolve(tools, answer)`,
-`SkillError`. Full types in `index.d.ts`.
+`includedFiles(skill)`, `programs(skill)`, `compile(skill)`,
+`resolve(tools, answer)`, `SkillError`. Full types in `index.d.ts`.
 
 ## License
 
