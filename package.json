@@ -1,6 +1,6 @@
 {
   "name": "@crtrs/skill",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Parser for hard skill files",
   "author": "CREATORS",
   "license": "Apache-2.0",
