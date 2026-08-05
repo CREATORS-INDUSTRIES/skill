@@ -48,6 +48,23 @@ params:
 run: uv run --script scripts/history.py $env
 ```
 
+Every param a tool declares appears in its `run`, so the run line is the whole
+call -- a release note is a single argv word, however long it is, and not
+something handed over on the side:
+
+```tool
+id: announce
+description: post the release note for a version
+params:
+  version:
+    type: string
+    description: version the note is about
+  note:
+    type: string
+    description: the release note, in full, newlines and all
+run: bash scripts/announce.sh $version $note
+```
+
 To see what is currently live, check the status:
 
 ```tool

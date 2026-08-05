@@ -92,12 +92,22 @@ function tokenize(run, id, file) {
 }
 
 /**
- * Check a template at parse time: every param it references was declared. A
- * `$typo` is a broken tool, and a broken tool should be an error when the file
- * is read, not the first time a model happens to call it.
+ * Check a template at parse time, both ways round: every `$name` it uses was
+ * declared, and every declared param is used.
+ *
+ * A `$typo` is a broken tool, and a broken tool should be an error when the
+ * file is read, not the first time a model happens to call it.
+ *
+ * The other direction is what makes the run line the whole contract. A param
+ * that never appears in the template still arrives -- as an environment
+ * variable, on stdin, in whatever side channel the host offers -- and then the
+ * command someone reads before approving the skill is no longer the command
+ * that runs. Everything a tool receives is in its argv, visible in the same
+ * line as the program it hands it to.
  */
 function checkTemplate(run, declared, id, file) {
   const names = new Set(declared);
+  const used = new Set();
   for (const word of tokenize(run, id, file)) {
     for (const seg of word) {
       if (seg.param === undefined) continue;
@@ -108,6 +118,15 @@ function checkTemplate(run, declared, id, file) {
           file,
         );
       }
+      used.add(seg.param);
+    }
+  }
+  for (const name of names) {
+    if (!used.has(name)) {
+      throw new SkillError(
+        `tool '${id}': param '${name}' is declared but never used in run -- every param has to appear in the template, so what a tool receives is what its run line says`,
+        file,
+      );
     }
   }
 }

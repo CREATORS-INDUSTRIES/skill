@@ -48,6 +48,7 @@ A tool fence has four keys: `id`, `description`, `params`, `run`.
 - Params are flat JSON Schema: `type`, `format`, `enum`, `description`, `default`.
 - No `default` means required.
 - Anything outside the shape is a `SkillError` at parse time.
+- Every param appears in `run`, and every `$name` in `run` is a declared param. Both directions are checked at parse time.
 - `run` becomes an argv, `$param` substitutes per word. No shell, ever:
 
 ```js
@@ -55,6 +56,27 @@ A tool fence has four keys: `id`, `description`, `params`, `run`.
 // { operation: 'accept', user: 'x@y.z' }
 ['uv', 'run', 'waitlist/handle.py', '--accept', 'x@y.z']
 ```
+
+### The run line is the whole call
+
+A param that never appears in the template is a `SkillError`, the same as a
+`$name` no param declares. The rule runs both ways on purpose: a param the
+template does not mention would still reach the tool — through an environment
+variable, on stdin, through whatever side channel a host offers — and then the
+command someone read before approving the skill is not the command that runs.
+
+```yaml
+params:
+  path:
+    type: string
+  content:
+    type: string
+run: tee $path        # SkillError: 'content' is declared but never used in run
+```
+
+A whole file, a blob of JSON, a secret: if a tool receives it, it is an argv
+word, and the run line says so. Values substitute inside their word and never
+split it, so size and spaces are not a reason to reach for another channel.
 
 ### What a skill carries
 

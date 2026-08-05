@@ -7,10 +7,14 @@
 const assert = require('assert');
 const { SkillError, parseSkill, resolve, programs } = require('..');
 
-// A skill built around one run template, so a case is one string.
+// A skill built around one run template, so a case is one string. The param
+// block is only declared when the run uses it: a param that never appears in
+// the template is a parse error (case 11), so a case about metacharacters
+// cannot carry an unused `text` along for the ride.
 function toolWith(run, params = 'text:\n    type: string\n    default: x') {
+  const block = /\$[A-Za-z_]/.test(run) ? `params:\n  ${params}\n` : '';
   return parseSkill(
-    `---\nskill: t\n---\n\n\`\`\`tool\nid: t\ndescription: d\nparams:\n  ${params}\nrun: ${run}\n\`\`\`\n`,
+    `---\nskill: t\n---\n\n\`\`\`tool\nid: t\ndescription: d\n${block}run: ${run}\n\`\`\`\n`,
   ).tools[0];
 }
 const argv = (run, args = {}) => resolve([toolWith(run)], { tool: 't', args }).argv;
@@ -102,6 +106,23 @@ assert.throws(() => toolWith('   '), (e) => e instanceof SkillError && /missing 
 assert.throws(
   () => toolWith('ls $txet'),
   (e) => e instanceof SkillError && /run references \$txet, which is not a declared param \(declared: text\)/.test(e.message),
+);
+
+// 11. And the other way round: a declared param that never appears in the run
+// is a parse error too. Otherwise it would still arrive -- on stdin, in an env
+// var, in whatever the host offers -- and the line someone read before
+// approving the skill would not be the whole call.
+assert.throws(
+  () => toolWith('cat $text', 'text:\n    type: string\n  extra:\n    type: string'),
+  (e) => e instanceof SkillError && /param 'extra' is declared but never used in run/.test(e.message),
+);
+
+// A param used only inside a list item counts as used, wherever in the word.
+assert.doesNotThrow(() =>
+  parseSkill(
+    ['---', 'skill: t', '---', '', '```tool', 'id: t', 'params:', '  f:', '    type: string',
+     'run:', '  - awk', '  - -v', '  - file=$f', '```', ''].join('\n'),
+  ),
 );
 
 // 10. A tool with no params still runs, and the error names that it has none.
