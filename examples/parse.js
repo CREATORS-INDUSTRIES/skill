@@ -1,14 +1,15 @@
 'use strict';
 
-// Parse a skill file and show it in three sections: the skill header, each
-// tool with its params, and the compiled skill -- the system text as the
-// model receives it, with every tool fence interpolated down to its id.
+// Parse a skill file and show it in four sections: the skill header, what it
+// carries beside its own text, each tool with its params, and the compiled
+// skill -- the system text as the model receives it, with every tool fence
+// interpolated down to its id.
 //
 //   node examples/parse.js                # bundled examples/SKILL.md
 //   node examples/parse.js path/SKILL.md  # your own skill
 
 const { join } = require('path');
-const { parseSkillFile, compile } = require('..');
+const { parseSkillFile, compile, includedFiles } = require('..');
 
 const file = process.argv[2] || join(__dirname, 'SKILL.md');
 
@@ -40,6 +41,15 @@ try {
 section('skill');
 console.log(`${bold(skill.name || '(unnamed)')} ${gray(`${skill.tools.length} tools`)}`);
 if (skill.description) console.log(skill.description);
+
+// What the skill carries: the entries as declared, then the files they
+// actually resolve to -- a directory is everything under it. This is the list
+// that has to travel with the skill for its tools to run anywhere else.
+if (skill.includes.length > 0) {
+  section('includes');
+  console.log(skill.includes.join(', '));
+  for (const path of includedFiles(skill)) console.log(gray(`  ${path}`));
+}
 
 section('tools');
 skill.tools.forEach((tool, i) => {

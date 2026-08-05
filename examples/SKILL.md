@@ -1,10 +1,15 @@
 ---
 skill: deploy
 description: Deploy the app, roll it back, and check what is live.
+includes: scripts
 ---
 
 This skill operates the app's deploy pipeline. One environment at a time;
 production always asks for an explicit version.
+
+Both tools run a script that ships with the skill, which is what `includes:`
+declares: `scripts` is a directory, so everything under it belongs to the
+skill and travels with it.
 
 To ship or roll back, use the deploy tool:
 

@@ -56,6 +56,41 @@ A tool fence has four keys: `id`, `description`, `params`, `run`.
 ['uv', 'run', 'waitlist/handle.py', '--accept', 'x@y.z']
 ```
 
+### What a skill carries
+
+A tool that runs `uv run handle.py` needs `handle.py`. `includes:` in the
+frontmatter is where a skill says so — comma separated, each entry a path
+relative to the skill's directory:
+
+```yaml
+---
+skill: waitlist
+description: Accept, reject and inspect waitlist signups.
+includes: handle.py, queries, Makefile
+---
+```
+
+An entry is whatever is at that path. Nothing is read into its name — an
+extension is not what makes something a file — so the filesystem answers: a
+file is that file, a directory is everything under it, however deep. A path
+that is absolute, starts with `~`, or climbs out with `..` is a `SkillError`:
+a skill reaches inside its own directory and nowhere else, which is what lets
+it travel.
+
+`parseSkillFile` checks them. A declared include that is not there is a broken
+skill and fails when the file is read, the same as a `$typo` in a `run`
+template — not the first time a model calls the tool.
+
+```js
+skill.includes;          // ['handle.py', 'queries', 'Makefile'] -- as declared
+includedFiles(skill);    // ['Makefile', 'handle.py', 'queries/nested/deep.sql', ...]
+```
+
+`includedFiles` expands the declaration into the actual files, relative to
+`skill.workdir` and sorted: the list to pack, to digest, or to copy when a
+skill moves. Symlinks are refused rather than followed — what one points at is
+not part of the skill, and it would arrive somewhere else as a dangling name.
+
 ### When a word needs a space
 
 Whitespace ends a word, which is all a command line ever needs — until one
@@ -134,8 +169,8 @@ const tools = skill.tools.map((tool) => ({
 ```
 
 API: `parseSkill(source, { file, workdir })`, `parseSkillFile(path)`,
-`compile(skill)`, `resolve(tools, answer)`, `SkillError`. Full types in
-`index.d.ts`.
+`includedFiles(skill)`, `compile(skill)`, `resolve(tools, answer)`,
+`SkillError`. Full types in `index.d.ts`.
 
 ## License
 

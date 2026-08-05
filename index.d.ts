@@ -47,6 +47,18 @@ export interface Skill {
   name: string | undefined;
   /** `description:` value from the frontmatter, if present. */
   description: string | undefined;
+  /**
+   * `includes:` from the frontmatter, as declared: what the skill carries
+   * beside its own text -- the scripts its tools run, the data they read.
+   * Each entry is a path relative to the skill's directory and is whatever is
+   * at that path: a file is that file, a directory is everything under it.
+   * Expand them with `includedFiles`.
+   */
+  includes: string[];
+  /** The skill file's path, when it came from one. */
+  file: string | null;
+  /** The skill's directory: where its tools run and its includes live. */
+  workdir: string;
   tools: SkillTool[];
   /** The compiled template: prose with each tool fence replaced by its id. */
   rendered: string;
@@ -58,8 +70,19 @@ export function parseSkill(
   opts?: { file?: string; workdir?: string },
 ): Skill;
 
-/** Read and parse a skill file. Throws SkillError on any invalid shape. */
+/**
+ * Read and parse a skill file. Throws SkillError on any invalid shape, and on
+ * a declared include that is not in the skill's directory.
+ */
 export function parseSkillFile(file: string): Skill;
+
+/**
+ * Expand a skill's `includes` into the files they resolve to: paths relative
+ * to the skill's directory, directories walked whole, sorted. The list to
+ * pack, digest or copy when a skill moves. Throws SkillError when a declared
+ * include is missing, is a symlink, or is not a plain file.
+ */
+export function includedFiles(skill: Skill): string[];
 
 /**
  * Compile a parsed skill into the model-facing system text: the prose (fences

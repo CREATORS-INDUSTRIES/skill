@@ -5,16 +5,19 @@
 // statically -- each becomes a tool whose `schema` is valid JSON Schema, built
 // right here at parse time -- and the prose is rendered with every fence
 // replaced by its tool's id. The declared set of tools IS the skill's
-// contract. Pure: the only I/O is the read in `parseSkillFile`.
+// contract. Pure: the only I/O is the read in `parseSkillFile` and the
+// existence check `includedFiles` does for what the frontmatter declares.
 
-const { readFileSync } = require('fs');
-const { dirname, resolve: resolvePath } = require('path');
+const { readFileSync, lstatSync, readdirSync } = require('fs');
+const { dirname, join, relative, sep, isAbsolute, resolve: resolvePath } = require('path');
 const { SkillError } = require('./error');
 const { checkTemplate } = require('./argv');
 
 /**
  * Read and parse a skill file. Tool `run` templates resolve relative to the
- * file's directory (each tool carries it as `workdir`).
+ * file's directory (each tool carries it as `workdir`), and everything the
+ * frontmatter `includes:` must be in that directory -- a declared include
+ * that is not there throws here, not the first time a tool runs it.
  */
 function parseSkillFile(file) {
   const path = resolvePath(file);
@@ -24,7 +27,9 @@ function parseSkillFile(file) {
   } catch (err) {
     throw new SkillError(err.message, path);
   }
-  return parseSkill(source, { file: path, workdir: dirname(path) });
+  const skill = parseSkill(source, { file: path, workdir: dirname(path) });
+  includedFiles(skill);
+  return skill;
 }
 
 /**
@@ -36,7 +41,7 @@ function parseSkillFile(file) {
  * @param {object} [opts]
  * @param {string} [opts.file] path used in error messages
  * @param {string} [opts.workdir] directory tool `run` commands execute from
- * @returns {{ name: string|undefined, description: string|undefined, tools: object[], rendered: string }}
+ * @returns {{ name: string|undefined, description: string|undefined, includes: string[], file: string|null, workdir: string, tools: object[], rendered: string }}
  */
 function parseSkill(source, opts) {
   const file = (opts && opts.file) || null;
@@ -77,15 +82,114 @@ function parseSkill(source, opts) {
   }
   if (fence !== null) throw new SkillError('unterminated ```tool block', file);
 
-  // Frontmatter keys: `skill:` names the skill, `description:` summarizes it.
+  // Frontmatter keys: `skill:` names the skill, `description:` summarizes it,
+  // `includes:` lists what it carries beside its own text.
   const name = (fm.match(/^skill:\s*(.+)$/m) || [])[1];
   const description = (fm.match(/^description:\s*(.+)$/m) || [])[1];
   return {
     name: name && name.trim(),
     description: description && description.trim(),
+    includes: parseIncludes(fm, file),
+    file,
+    workdir,
     tools,
     rendered: rendered.join('\n').trim(),
   };
+}
+
+// `includes:` -- what a skill carries beside its own text: the script a tool
+// runs, the data it reads. Comma separated, same shape as a param's `enum`,
+// each entry a path relative to the skill's directory:
+//
+//   includes: handle.py, queries, Makefile
+//
+// An entry is whatever is at that path. Nothing is inferred from its name --
+// an extension is not what makes something a file (Makefile, LICENSE), so the
+// filesystem answers: a file is that file, a directory is everything under it.
+function parseIncludes(fm, file) {
+  const raw = (fm.match(/^includes:\s*(.+)$/m) || [])[1];
+  if (raw === undefined) return [];
+  const names = [];
+  for (const entry of raw.split(',')) {
+    // A trailing slash is how people write directories; it means nothing here,
+    // since what an entry is comes from the filesystem, not from its spelling.
+    const name = entry.trim().replace(/\/+$/, '');
+    if (!name) continue;
+    checkInclude(name, file);
+    if (names.includes(name)) throw new SkillError(`duplicate include '${name}'`, file);
+    names.push(name);
+  }
+  return names;
+}
+
+// An include names something inside the skill, and only that. A skill is a
+// directory that travels -- to another machine, out of a package, off a URL --
+// so a path that reaches outside it is a skill that cannot be moved, and an
+// absolute one is a skill that only works here.
+function checkInclude(name, file) {
+  if (isAbsolute(name) || name.startsWith('~')) {
+    throw new SkillError(`include '${name}': must be relative to the skill's directory`, file);
+  }
+  const parts = name.split(/[\\/]/);
+  if (parts.some((part) => part === '' || part === '.' || part === '..')) {
+    throw new SkillError(`include '${name}': must stay inside the skill's directory`, file);
+  }
+}
+
+/**
+ * The files a skill's `includes` resolve to: every declared entry expanded --
+ * a file is itself, a directory is everything under it -- as paths relative to
+ * the skill's directory, sorted. This is the list to pack, to digest, or to
+ * copy when a skill moves; a skill with no includes has nothing to move.
+ *
+ * Throws SkillError when a declared include is not there, which is why
+ * `parseSkillFile` calls it: a skill missing what it runs is broken when the
+ * file is read, not when a model finally calls the tool.
+ */
+function includedFiles(skill) {
+  const files = [];
+  for (const name of skill.includes) {
+    const path = join(skill.workdir, name);
+    let stat;
+    try {
+      stat = lstatSync(path);
+    } catch {
+      throw new SkillError(
+        `include '${name}' is declared but not in ${skill.workdir}`,
+        skill.file || null,
+      );
+    }
+    if (stat.isDirectory()) walk(path, skill, files);
+    else if (stat.isFile()) files.push(name);
+    else throw notAFile(name, skill, stat.isSymbolicLink());
+  }
+  return [...new Set(files)].sort();
+}
+
+// Everything under a declared directory, whatever it is called and however
+// deep. A directory is declared whole: nothing here decides that a name looks
+// unimportant and drops it.
+function walk(dir, skill, files) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const path = join(dir, entry.name);
+    if (entry.isDirectory()) walk(path, skill, files);
+    else if (entry.isFile()) files.push(rel(skill.workdir, path));
+    else throw notAFile(rel(skill.workdir, path), skill, entry.isSymbolicLink());
+  }
+}
+
+// A path relative to the skill's directory, always with forward slashes so the
+// list reads the same on every platform.
+function rel(workdir, path) {
+  return relative(workdir, path).split(sep).join('/');
+}
+
+// A symlink is refused rather than followed: what it points at is not part of
+// the skill, and a skill that packs one arrives somewhere else as a dangling
+// name. Anything else that is not a plain file cannot travel at all.
+function notAFile(name, skill, symlink) {
+  const what = symlink ? 'a symlink' : 'not a file';
+  return new SkillError(`include '${name}' is ${what}`, skill.file || null);
 }
 
 // JSON Schema primitive types: the only valid values for a param's `type`.
@@ -212,4 +316,4 @@ function parseToolBlock(body, file, workdir) {
   };
 }
 
-module.exports = { parseSkill, parseSkillFile };
+module.exports = { parseSkill, parseSkillFile, includedFiles };

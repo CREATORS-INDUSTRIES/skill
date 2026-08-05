@@ -11,7 +11,7 @@
 // called. Full types in index.d.ts.
 
 const { SkillError } = require('./error');
-const { parseSkill, parseSkillFile } = require('./parse');
+const { parseSkill, parseSkillFile, includedFiles } = require('./parse');
 const { compile } = require('./compile');
 const { resolve } = require('./resolve');
 
@@ -19,6 +19,7 @@ module.exports = {
   SkillError,
   parseSkill,
   parseSkillFile,
+  includedFiles,
   compile,
   resolve,
 };
